@@ -1,4 +1,3 @@
-from pprint import pprint
 from urllib.parse import urlencode
 import requests
 import json
@@ -38,28 +37,22 @@ class VK_api:
         }
 
     def get_photos(self):
-        photo_album = []
-        pic_likes = []
-        type_album = []
-        new_size = []
-        new_types = []
+        photo_dict ={}
         params_dict = self.get_common_params()
         params_dict.update({'user_id': self.user_id, 'album_id': 'profile', 'extended': '1'})
         response1 = requests.get(f'{self.API_BASE_URL}/photos.get', params = params_dict)
-        self_response = response1.json()['response']['items']
-        sort_by_date = sorted(self_response, key = lambda x: x['date'])
-        sort_by_likes = sorted(sort_by_date, key = lambda x: x['likes']['count'], reverse = True)
-        for answer in sort_by_likes:
-            pic_likes.append(answer['likes']['count'])
-            for size in answer.get('sizes'):
-                one_pic_sizes = {size.get('url'): size.get('height')}
-                size_types = {size.get('type'): size.get('height')}
-                new_types = sorted(size_types, key = lambda d: d[-1])
-                new_size = sorted(one_pic_sizes, key = lambda d: d[1])
-            photo_album.append(new_size[-1])
-            type_album.append(new_types[-1])
-        updated_album = dict(zip(photo_album, zip(pic_likes, type_album)))
-        return updated_album
+        for item in response1.json()['response']['items']:
+            likes = str(item.get('likes').get('count'))
+            date = item.get('date')
+            sizes = sorted(item.get('sizes'), key = lambda x: x['height']*x['width'])
+            type = sizes[-1].get('type')
+            url = sizes[-1].get('url')
+            size = {'type': type, 'url': url}
+            if likes in photo_dict:
+                photo_dict[f'{likes}({date})'] = size
+            else:
+                photo_dict[likes] = size
+        return photo_dict
 
     def upload_photos(self):
         path = 'VK_photo_copy'
@@ -75,23 +68,17 @@ class VK_api:
         requests.put(url_create_folder, params = params_dict, headers = headers)
         url_upload_photos = f'{url_yandisk}/v1/disk/resources/upload'
         count = 5
-        likes = 10000000000000000000000000000000000000000000000000000000000000000000000
-        for photo, likes_and_types in self.get_photos().items():
+        for item in self.get_photos().items():
             print(count, ':')
-            if likes_and_types[0] == likes:
-                likes = f'{likes_and_types[0]}({count})'
-            else:
-                likes = likes_and_types[0]
             if count != 0:
                 params_dict = {
-                    'path': f'{path}/{likes}',
-                    'url': photo
+                    'path': f'{path}/{item[0]}',
+                    'url': item[1].get('url')
                 }
                 count -= 1
                 response1 = requests.post(url_upload_photos, params = params_dict, headers = headers)
-                items.append({"file_name": f'{likes}.jpg',
-                              "size": likes_and_types[1]})
-                likes = likes_and_types[0]
+                items.append({"file_name": f'{item[0]}.jpg',
+                              "size": item[1].get('type')})
                 print(response1)
             else:
                 print('<All done!>')
@@ -110,4 +97,4 @@ class VK_api:
 if __name__ == '__main__':
     print(get_token_url())
     vk_client = VK_api(Token, user_id, ya_token)
-    pprint(vk_client.upload_photos())
+    print(vk_client.upload_photos())

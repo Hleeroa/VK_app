@@ -1,4 +1,3 @@
-pprint
 urllib.parse, urlencode
 requests
 json
